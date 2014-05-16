@@ -83,7 +83,7 @@ MODULE_LICENSE("GPLv2");
 #define S2W_X_B2                700
 #define S2W_X_FINAL             450
 #else
-/* Defaults for Monarudo */
+/* Defaults for Deluxe_J */
 #define S2W_Y_LIMIT             2725
 #define S2W_X_MAX               1540
 #define S2W_X_B1                500
