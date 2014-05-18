@@ -54,12 +54,12 @@
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
 #define MIN_FREQUENCY_DOWN_DIFFERENTIAL		(1)
-#define DEFAULT_FREQ_BOOST_TIME			(2500000)
+#define DEFAULT_FREQ_BOOST_TIME			(3500000)
 #define DEF_SAMPLING_RATE			(50000)
 #define BOOSTED_SAMPLING_RATE			(15000)
-#define DBS_INPUT_EVENT_MIN_FREQ		(1134000)
-#define DBS_SYNC_FREQ				(810000)
-#define DBS_OPTIMAL_FREQ			(1296000)
+#define DBS_INPUT_EVENT_MIN_FREQ		(1026000)
+#define DBS_SYNC_FREQ				(702000)
+#define DBS_OPTIMAL_FREQ			(1512000)
 
 static u64 freq_boosted_time;
 /*
@@ -1201,9 +1201,10 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 				freq_next = dbs_tuners_ins.sync_freq;
 
 			if (max_load_freq >
-				 (dbs_tuners_ins.up_threshold_multi_core -
+				 ((dbs_tuners_ins.up_threshold_multi_core -
 				  dbs_tuners_ins.down_differential_multi_core) *
-				  policy->cur)
+				  policy->cur) &&
+				freq_next < dbs_tuners_ins.optimal_freq)
 				freq_next = dbs_tuners_ins.optimal_freq;
 
 		}
