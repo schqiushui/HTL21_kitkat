@@ -252,9 +252,6 @@ enum {
 #ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
 int set_two_phase_freq(int cpufreq);
 #endif
-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND 
-int id_set_two_phase_freq(int cpufreq);
-#endif
 
 int set_input_event_min_freq_by_cpu(int cpu_nr, int cpufreq);
 
@@ -5497,10 +5494,7 @@ static void __init deluxe_j_common_init(void)
 
 	platform_device_register(&msm_dev_avtimer_device);
 }
-/*
-unsigned long ion_kgsl_heap_vaddr = 0;
-unsigned long ion_kgsl_heap_paddr = 0;
-*/
+
 static void __init deluxe_j_allocate_memory_regions(void)
 {
 #ifdef CONFIG_KEXEC_HARDBOOT
@@ -5555,14 +5549,10 @@ static void __init deluxe_j_cdp_init(void)
         if(!cpu_is_krait_v1())
                 set_two_phase_freq(1134000);
 #endif
-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
-        if(!cpu_is_krait_v1())
-                id_set_two_phase_freq(1134000);
-#endif
-	set_input_event_min_freq_by_cpu(1, 1134000);
-	set_input_event_min_freq_by_cpu(2, 1026000);
-	set_input_event_min_freq_by_cpu(3, 810000);
-	set_input_event_min_freq_by_cpu(4, 810000);
+	set_input_event_min_freq_by_cpu(1, 918000);
+	set_input_event_min_freq_by_cpu(2, 918000);
+	set_input_event_min_freq_by_cpu(3, 918000);
+	set_input_event_min_freq_by_cpu(4, 918000);
 
 	
 	
