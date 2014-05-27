@@ -2536,6 +2536,54 @@ static struct slim_device deluxe_j_slim_tabla20 = {
 		.platform_data = &deluxe_j_tabla20_platform_data,
 	},
 };
+static DEFINE_MUTEX(tp_lock);
+static struct regulator *tp_reg_l15;
+static int synaptics_power_LPM(int on)
+{
+	int rc = 0;
+
+	mutex_lock(&tp_lock);
+	pr_info("[TP] %s: enter:%d\n", __func__, on);
+
+	if (tp_reg_l15 == NULL) {
+		tp_reg_l15 = regulator_get(NULL, "8921_l15");
+		if (IS_ERR(tp_reg_l15)) {
+			pr_err("[TP] %s: Unable to get '8921_l15' \n", __func__);
+			mutex_unlock(&tp_lock);
+			return -ENODEV;
+		}
+	}
+	if (on == 1) {
+		rc = regulator_set_optimum_mode(tp_reg_l15, 100);
+		if (rc < 0)
+			pr_err("[TP] %s: enter LPM,set_optimum_mode l15 failed, rc=%d\n", __func__, rc);
+
+		rc = regulator_enable(tp_reg_l15);
+		if (rc) {
+			pr_err("'%s' regulator enable failed rc=%d\n",
+				"tp_reg_l15", rc);
+			mutex_unlock(&tp_lock);
+			return rc;
+		}
+		pr_info("[TP] %s: enter LPM mode\n", __func__);
+	} else {
+		rc = regulator_set_optimum_mode(tp_reg_l15, 100000);
+		if (rc < 0)
+			pr_err("[TP] %s: leave LPM,set_optimum_mode l15 failed, rc=%d\n", __func__, rc);
+
+		rc = regulator_enable(tp_reg_l15);
+		if (rc) {
+			pr_err("'%s' regulator enable failed, rc=%d\n",
+				"tp_reg_l15", rc);
+			mutex_unlock(&tp_lock);
+			return rc;
+		}
+		pr_info("[TP] %s: leave LPM mode\n", __func__);
+		usleep(10);
+	}
+	mutex_unlock(&tp_lock);
+	return rc;
+}
 
 static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = { 
 	{
@@ -2549,11 +2597,12 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 		.display_height = 1920,
 		.gpio_irq = TP_ATTz,
 		.gpio_reset = TP_RSTz,
-		.default_config = 1,
 		.report_type = SYN_AND_REPORT_TYPE_B,
+		.default_config = 1,
+		.tw_pin_mask = 0x0088,
 		.psensor_detection = 1,
-		.tw_pin_mask = 0x0080,
 		.reduce_report_level = {60, 60, 50, 0, 0},
+		.lpm_power = synaptics_power_LPM,
 		.config = {0x33, 0x32, 0x00, 0x07, 0x00, 0x7F, 0x03, 0x1E,
 			0x05, 0x09, 0x00, 0x01, 0x01, 0x00, 0x10, 0x54,
 			0x06, 0x40, 0x0B, 0x02, 0x14, 0x1E, 0x05, 0x50,
@@ -2615,6 +2664,7 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 		.tw_pin_mask = 0x0080,
 		.PixelTouchThreshold_bef_unlock = 208,
 		.reduce_report_level = {60, 60, 50, 0, 0},
+		.lpm_power = synaptics_power_LPM,
 		.config = {0x33, 0x32, 0x00, 0x05, 0x00, 0x7F, 0x03, 0x1E,
 			0x05, 0x09, 0x00, 0x01, 0x01, 0x00, 0x10, 0x54,
 			0x06, 0x40, 0x0B, 0x02, 0x14, 0x1E, 0x05, 0x50,
@@ -2675,6 +2725,7 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 		.large_obj_check = 1,
 		.tw_pin_mask = 0x0080,
 		.reduce_report_level = {60, 60, 50, 0, 0},
+		.lpm_power = synaptics_power_LPM,
 		.config = {0x33, 0x32, 0x00, 0x03, 0x04, 0x7F, 0x03, 0x1E,
 			0x05, 0x09, 0x00, 0x01, 0x01, 0x00, 0x10, 0x54,
 			0x06, 0x40, 0x0B, 0x02, 0x14, 0x23, 0x05, 0x50,
@@ -2831,8 +2882,6 @@ static ssize_t virtual_syn_keys_show(struct kobject *kobj,
 
 }
 
-
-
 static struct kobj_attribute syn_virtual_keys_attr = {
 	.attr = {
 		.name = "virtualkeys.synaptics-rmi-touchscreen",
@@ -2841,14 +2890,10 @@ static struct kobj_attribute syn_virtual_keys_attr = {
 	.show = &virtual_syn_keys_show,
 };
 
-
-
 static struct attribute *properties_attrs[] = {
 	&syn_virtual_keys_attr.attr,
 	NULL
 };
-
-
 
 static struct attribute_group properties_attr_group = {
 	.attrs = properties_attrs,
