@@ -229,7 +229,7 @@ static struct gpiomux_setting wcnss_5wire_active_cfg = {
 
 static struct gpiomux_setting slimbus = {
 	.func = GPIOMUX_FUNC_1,
-	.drv = GPIOMUX_DRV_6MA,
+	.drv = GPIOMUX_DRV_16MA,
 	.pull = GPIOMUX_PULL_KEEPER,
 };
 
@@ -314,6 +314,21 @@ static struct gpiomux_setting hsic_wakeup_sus_cfg = {
 	.dir = GPIOMUX_IN,
 };
 
+static struct gpiomux_setting modem_lte_frame_sync_act_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_4MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_IN,
+};
+
+
+static struct gpiomux_setting modem_lte_frame_sync_sus_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_4MA,
+	.pull = GPIOMUX_PULL_NONE,
+	.dir = GPIOMUX_OUT_LOW,
+};
+
 #if 0
 static struct gpiomux_setting cyts_resout_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -394,6 +409,13 @@ static struct msm_gpiomux_config deluxe_j_hsic_configs[] = {
 		.settings = {
 			[GPIOMUX_ACTIVE] = &hsic_wakeup_act_cfg,
 			[GPIOMUX_SUSPENDED] = &hsic_wakeup_sus_cfg,
+		},
+	},
+	{
+		.gpio = 60,				
+		.settings = {
+			[GPIOMUX_ACTIVE] = &modem_lte_frame_sync_act_cfg,
+			[GPIOMUX_SUSPENDED] = &modem_lte_frame_sync_sus_cfg,
 		},
 	},
 };

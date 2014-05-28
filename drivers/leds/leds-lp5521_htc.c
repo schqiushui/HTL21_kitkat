@@ -583,6 +583,8 @@ static ssize_t lp5521_led_off_timer_store(struct device *dev,
 		return -EINVAL;
 	if (sec < 0 || sec > 255)
 		return -EINVAL;
+	if (min == 0 && sec ==0)
+		return count;
 
 	led_cdev = (struct led_classdev *)dev_get_drvdata(dev);
 	ldata = container_of(led_cdev, struct lp5521_led, cdev);

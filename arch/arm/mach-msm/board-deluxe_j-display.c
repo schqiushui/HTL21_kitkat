@@ -35,6 +35,7 @@
 #include "../../../../drivers/video/msm/mdp4.h"
 #include <linux/i2c.h>
 #include <mach/msm_xo.h>
+#include <mach/htc_battery_common.h>
 
 #define hr_msleep(x) msleep(x)
 
@@ -850,7 +851,6 @@ static struct platform_device wfd_device = {
     .dev.platform_data = &wfd_pdata,
 };
 #endif
-
 void __init deluxe_j_mdp_writeback(struct memtype_reserve* reserve_table)
 {
 	mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
@@ -863,12 +863,9 @@ void __init deluxe_j_mdp_writeback(struct memtype_reserve* reserve_table)
 #endif
 }
 static int first_init = 1;
-uint32_t cfg_panel_te_active[] = {GPIO_CFG(LCD_TE, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA)};
-uint32_t cfg_panel_te_sleep[] = {GPIO_CFG(LCD_TE, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA)};
-
+static bool dsi_power_on;
 static int mipi_dsi_panel_power(int on)
 {
-	static bool dsi_power_on = false;
 	static struct regulator *reg_lvs5, *reg_l2;
 	static int gpio36, gpio37;
 	int rc;
@@ -968,17 +965,7 @@ static int mipi_dsi_panel_power(int on)
 			msleep(10);
 			msm_xo_mode_vote(wa_xo, MSM_XO_MODE_OFF);
 		}
-		rc = gpio_tlmm_config(cfg_panel_te_active[0], GPIO_CFG_ENABLE);
-		if (rc) {
-			pr_err("%s: gpio_tlmm_config(%#x)=%d\n", __func__,
-					cfg_panel_te_active[0], rc);
-		}
 	} else {
-		rc = gpio_tlmm_config(cfg_panel_te_sleep[0], GPIO_CFG_ENABLE);
-		if (rc) {
-			pr_err("%s: gpio_tlmm_config(%#x)=%d\n", __func__,
-					cfg_panel_te_sleep[0], rc);
-		}
 		gpio_tlmm_config(GPIO_CFG(BL_HW_EN, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 		gpio_set_value(BL_HW_EN, 0);
 
@@ -1081,8 +1068,6 @@ static char Color_enhancement[33]= {
 	0x10, 0x10, 0x10, 0x10,
 	0x10};
 
-static char Outline_Sharpening_Control[3]= {
-	0xDD, 0x11, 0xA1};
 
 static char BackLight_Control_6[8]= {
 	0xCE, 0x00, 0x07, 0x00,
@@ -1101,7 +1086,7 @@ static struct dsi_cmd_desc sharp_video_on_cmds[] = {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(nop), nop},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(Manufacture_Command_setting), Manufacture_Command_setting},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(Color_enhancement), Color_enhancement},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(Outline_Sharpening_Control), Outline_Sharpening_Control},
+	
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(BackLight_Control_6), BackLight_Control_6},
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(write_control_display), write_control_display},
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(CABC), CABC},
@@ -1116,7 +1101,7 @@ static struct dsi_cmd_desc sony_video_on_cmds[] = {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 0, sizeof(nop), nop},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(hsync_output), hsync_output},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(Color_enhancement), Color_enhancement},
-	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(Outline_Sharpening_Control), Outline_Sharpening_Control},
+	
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(BackLight_Control_6), BackLight_Control_6},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(Manufacture_Command_setting), Manufacture_Command_setting},
 	{DTYPE_GEN_LWRITE, 1, 0, 0, 0, sizeof(protect_on), protect_on},
@@ -1165,6 +1150,7 @@ static uint32 mipi_renesas_manufacture_id(struct msm_fb_data_type *mfd)
 	return *lp;
 }
 #endif
+
 static int resume_blk = 0;
 static struct i2c_client *blk_pwm_client;
 static struct dcs_cmd_req cmdreq;
@@ -1186,7 +1172,6 @@ static int deluxe_j_lcd_on(struct platform_device *pdev)
 			mipi_dsi_cmds_tx(&deluxe_j_panel_tx_buf, video_on_cmds,
 				video_on_cmds_count);
 		}
-
 	}
 	first_init = 0;
 	
@@ -1206,8 +1191,6 @@ static int deluxe_j_lcd_off(struct platform_device *pdev)
 		return -EINVAL;
 
 	resume_blk = 1;
-
-	PR_DISP_INFO("%s\n", __func__);
 	return 0;
 }
 static int __devinit deluxe_j_lcd_probe(struct platform_device *pdev)
@@ -1454,7 +1437,6 @@ static int __init mipi_video_sharp_init(void)
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
 	pinfo.mipi.frame_rate = 60;
 	pinfo.mipi.dsi_phy_db = &dsi_video_mode_phy_db;
-	pinfo.mipi.esc_byte_ratio = 5;
 
 	ret = mipi_deluxe_j_device_register(&pinfo, MIPI_DSI_PRIM,
 						MIPI_DSI_PANEL_FWVGA_PT);
@@ -1471,7 +1453,6 @@ static int __init mipi_video_sharp_init(void)
 	mdp_gamma = mdp_gamma_sharp;
 	mdp_gamma_count = ARRAY_SIZE(mdp_gamma_sharp);
 
-	PR_DISP_INFO("%s\n", __func__);
 	return ret;
 }
 
@@ -1532,7 +1513,6 @@ static int __init mipi_video_sony_init(void)
 	pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;
 	pinfo.mipi.frame_rate = 60;
 	pinfo.mipi.dsi_phy_db = &dsi_video_mode_phy_db;
-	pinfo.mipi.esc_byte_ratio = 5;
 
 	ret = mipi_deluxe_j_device_register(&pinfo, MIPI_DSI_PRIM,
 						MIPI_DSI_PANEL_FWVGA_PT);
@@ -1549,7 +1529,6 @@ static int __init mipi_video_sony_init(void)
 	mdp_gamma = mdp_gamma_sony;
 	mdp_gamma_count = ARRAY_SIZE(mdp_gamma_sony);
 
-	PR_DISP_INFO("%s\n", __func__);
 	return ret;
 }
 
@@ -1592,7 +1571,8 @@ void __init deluxe_j_init_fb(void)
 	platform_device_register(&msm_fb_device);
 
 	if(panel_type != PANEL_ID_NONE) {
-		if ((board_mfg_mode() == 4) || (board_mfg_mode() == 5))
+		if ((board_mfg_mode() == 4) ||
+			(board_mfg_mode() == 5 && !(htc_battery_get_zcharge_mode() & 0x1)))
 			 mdp_pdata.cont_splash_enabled = 0x0;
 		msm_fb_register_device("mdp", &mdp_pdata);
 		msm_fb_register_device("mipi_dsi", &mipi_dsi_pdata);

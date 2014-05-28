@@ -345,19 +345,6 @@ static struct smb349_platform_data smb349_data = {
 	.chg_current_ma = 0,
 };
 
-#ifdef CONFIG_SUPPORT_DQ_BATTERY
-static int __init check_dq_setup(char *str)
-{
-	if (!strcmp(str, "PASS"))
-		smb349_data.dq_result = 1;
-	else
-		smb349_data.dq_result = 0;
-
-	return 1;
-}
-__setup("androidboot.dq=", check_dq_setup);
-#endif
-
 static struct i2c_board_info msm_smb_349_boardinfo[] __initdata = {
 	{
 		I2C_BOARD_INFO("smb349", 0xD4 >> 1),
@@ -1014,19 +1001,17 @@ static void __init deluxe_j_early_reserve(void)
 #ifdef CONFIG_HTC_PNPMGR
 extern int pnpmgr_battery_charging_enabled(int charging_enabled);
 #endif 
-static int critical_alarm_voltage_mv[] = {3000, 3100, 3200, 3400};
+static int critical_alarm_voltage_mv[] = {3000, 3200, 3400};
 
 static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.guage_driver = 0,
 	.chg_limit_active_mask = HTC_BATT_CHG_LIMIT_BIT_TALK |
-								HTC_BATT_CHG_LIMIT_BIT_NAVI |
-								HTC_BATT_CHG_LIMIT_BIT_THRML,
+								HTC_BATT_CHG_LIMIT_BIT_NAVI,
 	.critical_low_voltage_mv = 3100,
 	.critical_alarm_vol_ptr = critical_alarm_voltage_mv,
 	.critical_alarm_vol_cols = sizeof(critical_alarm_voltage_mv) / sizeof(int),
 	.overload_vol_thr_mv = 4000,
 	.overload_curr_thr_ma = 0,
-	.smooth_chg_full_delay_min = 1,
 	
 #ifdef CONFIG_SMB349_CHARGER
 	.icharger.name = "smb349",
@@ -1034,6 +1019,7 @@ static struct htc_battery_platform_data htc_battery_pdev_data = {
 	.icharger.set_limit_charge_enable = smb349_limit_charge_enable,
 	.icharger.is_batt_charge_enable =  smb349_is_batt_charge_enable,
 	.icharger.get_attr_text = pm8921_charger_get_attr_text_with_ext_charger,
+	.icharger.max_input_current = smb349_set_hsml_target_ma,
 	.icharger.enable_5v_output = smb349_enable_5v_output,
 #else
 	.icharger.name = "pm8921",
@@ -1670,12 +1656,6 @@ static struct i2c_board_info msm_i2c_mhl_sii9234_info[] =
 static struct msm_bus_vectors hsic_init_vectors[] = {
        {
                .src = MSM_BUS_MASTER_SPS,
-               .dst = MSM_BUS_SLAVE_EBI_CH0,
-               .ab = 0,
-               .ib = 0,
-       },
-       {
-               .src = MSM_BUS_MASTER_SPS,
                .dst = MSM_BUS_SLAVE_SPS,
                .ab = 0,
                .ib = 0,
@@ -1685,15 +1665,9 @@ static struct msm_bus_vectors hsic_init_vectors[] = {
 static struct msm_bus_vectors hsic_max_vectors[] = {
        {
                .src = MSM_BUS_MASTER_SPS,
-               .dst = MSM_BUS_SLAVE_EBI_CH0,
-               .ab = 60000000,         
-               .ib = 960000000,        
-       },
-       {
-               .src = MSM_BUS_MASTER_SPS,
                .dst = MSM_BUS_SLAVE_SPS,
                .ab = 0,
-               .ib = 512000000, 
+               .ib = 256000000, 
        },
 };
 
@@ -1838,7 +1812,7 @@ static struct msm_bus_scale_pdata usb_bus_scale_pdata = {
 };
 
 static int phy_init_seq[] = {
-       0x37, 0x81, 
+       0x58, 0x81, 
        0x3c, 0x82, 
        -1
 };
@@ -2068,7 +2042,7 @@ struct pm8xxx_gpio_init headset_pmic_gpio_xa[] = {
 
 static uint32_t headset_cpu_gpio_xa[] = {
 	GPIO_CFG(CPU_1WIRE_RX, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(CPU_1WIRE_TX, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+	GPIO_CFG(CPU_1WIRE_TX, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
 };
 
 static uint32_t headset_onewire_gpio[] = {
@@ -2597,10 +2571,10 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 		.display_height = 1920,
 		.gpio_irq = TP_ATTz,
 		.gpio_reset = TP_RSTz,
-		.report_type = SYN_AND_REPORT_TYPE_B,
 		.default_config = 1,
-		.tw_pin_mask = 0x0088,
+		.report_type = SYN_AND_REPORT_TYPE_B,
 		.psensor_detection = 1,
+		.tw_pin_mask = 0x0080,
 		.reduce_report_level = {60, 60, 50, 0, 0},
 		.lpm_power = synaptics_power_LPM,
 		.config = {0x33, 0x32, 0x00, 0x07, 0x00, 0x7F, 0x03, 0x1E,
@@ -2781,6 +2755,7 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 		.gpio_reset = TP_RSTz,
 		.default_config = 2,
 		.large_obj_check = 1,
+		.lpm_power = synaptics_power_LPM,
 		.config = {0x4D, 0x4F, 0x4F, 0x31, 0x04, 0x3F, 0x03, 0x1E,
 			0x05, 0xB1, 0x08, 0x0B, 0x19, 0x19, 0x00, 0x00,
 			0x54, 0x06, 0x40, 0x0B, 0x02, 0x14, 0x1E, 0x05,
@@ -2829,6 +2804,7 @@ static struct synaptics_i2c_rmi_platform_data syn_ts_3k_data[] = {
 		.gpio_irq = TP_ATTz,
 		.gpio_reset = TP_RSTz,
 		.default_config = 2,
+		.lpm_power = synaptics_power_LPM,
 		.config = {0x30, 0x32, 0x30, 0x30, 0x84, 0x0F, 0x03, 0x1E,
 			0x05, 0x20, 0xB1, 0x00, 0x0B, 0x19, 0x19, 0x00,
 			0x00, 0x54, 0x06, 0x40, 0x0B, 0x1E, 0x05, 0x2D,
@@ -2932,9 +2908,6 @@ static int deluxe_j_g_sensor_power_LPM(int on)
 		if (rc) {
 			pr_err("'%s' regulator enable failed, rc=%d\n",
 				"g_sensor_vreg_8921_l17", rc);
-			mutex_unlock(&sensor_lock);
-			printk(KERN_DEBUG "[GSNR][BMA250_BOSCH]%s unlock 2\n",
-					  __func__);
 			return rc;
 		}
 		printk(KERN_DEBUG "[GSNR][BMA250_BOSCH] %s, Set to Low Power"
@@ -2945,7 +2918,7 @@ static int deluxe_j_g_sensor_power_LPM(int on)
 			pr_err("[GSNR][BMA250_BOSCH] set_optimum_mode L17 to"
 				" Normal mode failed, rc = %d\n", rc);
 			mutex_unlock(&sensor_lock);
-			printk(KERN_DEBUG "[GSNR][BMA250_BOSCH]%s unlock 32\n",
+			printk(KERN_DEBUG "[GSNR][BMA250_BOSCH]%s unlock 2\n",
 					  __func__);
 			return -EINVAL;
 		}
@@ -2953,16 +2926,13 @@ static int deluxe_j_g_sensor_power_LPM(int on)
 		if (rc) {
 			pr_err("'%s' regulator enable failed, rc=%d\n",
 				"g_sensor_vreg_8921_l17", rc);
-			mutex_unlock(&sensor_lock);
-			printk(KERN_DEBUG "[GSNR][BMA250_BOSCH]%s unlock 4\n",
-					  __func__);
 			return rc;
 		}
 		printk(KERN_DEBUG "[GSNR][BMA250_BOSCH] %s, Set to Normal Mode\n",
 			__func__);
 	}
 	mutex_unlock(&sensor_lock);
-	printk(KERN_DEBUG "[GSNR][BMA250_BOSCH]%s: unlock 5\n", __func__);
+	printk(KERN_DEBUG "[GSNR][BMA250_BOSCH]%s: unlock 3\n", __func__);
 	return 0;
 }
 
@@ -3121,7 +3091,7 @@ static struct r3gd20_gyr_platform_data gyro_platform_data = {
        .min_interval = R3GD20_MIN_POLL_PERIOD_MS, 
        .watermark = 0,
        .fifomode = 0,
-		.power_LPM = deluxe_j_gyro_power_LPM,
+       .power_LPM = deluxe_j_gyro_power_LPM,
 };
 
 static struct i2c_board_info motion_sensor_gsbi_2_info[] = {
@@ -3645,6 +3615,27 @@ static struct msm_thermal_data msm_thermal_pdata = {
 	.temp_hysteresis = 10,
 	.limit_freq = 918000,*/
 };
+
+static int __init check_dq_setup(char *str)
+{
+	int i = 0;
+	int size = 0;
+
+	size = sizeof(chg_batt_params)/sizeof(chg_batt_params[0]);
+
+	if (!strcmp(str, "PASS")) {
+		
+	} else {
+		for(i=0; i < size; i++)
+		{
+			chg_batt_params[i].max_voltage = 4200;
+			chg_batt_params[i].cool_bat_voltage = 4200;
+		}
+	}
+	return 1;
+}
+__setup("androidboot.dq=", check_dq_setup);
+
 
 #define MSM_SHARED_RAM_PHYS 0x80000000
 static void __init deluxe_j_map_io(void)
@@ -4278,18 +4269,10 @@ static struct platform_device hdmi_msm_device = {
 	.dev.platform_data = &hdmi_msm_data,
 };
 
-#ifdef CONFIG_SMB349_CHARGER
-
-#else
-#define BOOST_5V	"ext_5v"
-static struct regulator *reg_boost_5v = NULL;
-#endif
 
 static int hdmi_enable_5v(int on)
 {
-#ifdef CONFIG_SMB349_CHARGER
-	return 0;
-#else
+#if 0
 	static int prev_on = 0;
 
 	int rc;
@@ -4560,11 +4543,7 @@ static struct platform_device *common_devices[] __initdata = {
 #ifdef CONFIG_MSM_RTB
 	&deluxe_j_rtb_device,
 #endif
-
-#ifdef CONFIG_MSM_GEMINI
 	&msm8960_gemini_device,
-#endif
-
 #ifdef CONFIG_BT
 	&msm_device_uart_dm6,
 	&deluxe_j_rfkill,
@@ -4576,8 +4555,8 @@ static struct platform_device *common_devices[] __initdata = {
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
 #endif
-	&apq8064_cpu_idle_device,
-	&apq8064_msm_gov_device,
+	&msm8960_cpu_idle_device,
+	&msm8960_msm_gov_device,
 	&msm_tsens_device,
 	&msm_device_tz_log,
 	&apq8064_iommu_domain_device,
@@ -4585,16 +4564,13 @@ static struct platform_device *common_devices[] __initdata = {
 	&apq8064_device_cache_erp,
 #endif
 #ifdef CONFIG_PERFLOCK
-	&apq8064_device_perf_lock,
+	&msm8064_device_perf_lock,
 #endif
 #if defined(CONFIG_TSIF) || defined(CONFIG_TSIF_MODULE)
 	&msm_device_tsif[1],
 #endif 
 	&apq_compr_dsp,
 	&apq_multi_ch_pcm,
-#ifdef CONFIG_AUDIO_LOW_LATENCY
-	&apq_lowlatency_pcm,
-#endif
 };
 
 static struct platform_device *cdp_devices[] __initdata = {
@@ -4677,7 +4653,9 @@ static struct msm_i2c_platform_data deluxe_j_i2c_qup_gsbi3_pdata = {
 static struct msm_i2c_platform_data deluxe_j_i2c_qup_gsbi4_pdata = {
 	.clk_freq = 400000,
 	.src_clk_rate = 24000000,
+#ifdef CONFIG_GSBI4_UARTDM
 	.share_uart_flag = 1,
+#endif
 };
 
 #ifdef CONFIG_SERIAL_IRDA
@@ -4747,69 +4725,6 @@ static int ethernet_init(void)
 	return 0;
 }
 #endif
-
-#define GPIO_KEY_HOME		PM8921_GPIO_PM_TO_SYS(27)
-#define GPIO_KEY_VOLUME_UP	PM8921_GPIO_PM_TO_SYS(35)
-#define GPIO_KEY_VOLUME_DOWN	PM8921_GPIO_PM_TO_SYS(38)
-#define GPIO_KEY_CAM_FOCUS	PM8921_GPIO_PM_TO_SYS(3)
-#define GPIO_KEY_CAM_SNAP	PM8921_GPIO_PM_TO_SYS(4)
-#define GPIO_KEY_ROTATION	46
-
-static struct gpio_keys_button cdp_keys[] = {
-	{
-		.code           = KEY_HOME,
-		.gpio           = GPIO_KEY_HOME,
-		.desc           = "home_key",
-		.active_low     = 1,
-		.type		= EV_KEY,
-		.wakeup		= 1,
-		.debounce_interval = 15,
-	},
-	{
-		.code           = KEY_VOLUMEUP,
-		.gpio           = GPIO_KEY_VOLUME_UP,
-		.desc           = "volume_up_key",
-		.active_low     = 1,
-		.type		= EV_KEY,
-		.wakeup		= 1,
-		.debounce_interval = 15,
-	},
-	{
-		.code           = KEY_VOLUMEDOWN,
-		.gpio           = GPIO_KEY_VOLUME_DOWN,
-		.desc           = "volume_down_key",
-		.active_low     = 1,
-		.type		= EV_KEY,
-		.wakeup		= 1,
-		.debounce_interval = 15,
-	},
-	{
-		.code           = SW_ROTATE_LOCK,
-		.gpio           = GPIO_KEY_ROTATION,
-		.desc           = "rotate_key",
-		.active_low     = 1,
-		.type		= EV_SW,
-		.debounce_interval = 15,
-	},
-};
-
-static struct gpio_keys_platform_data cdp_keys_data = {
-	.buttons        = cdp_keys,
-	.nbuttons       = ARRAY_SIZE(cdp_keys),
-};
-
-static struct platform_device cdp_kp_pdev = {
-	.name           = "gpio-keys",
-	.id             = -1,
-	.dev            = {
-		.platform_data  = &cdp_keys_data,
-	},
-};
-
-static struct platform_device msm_dev_avtimer_device = {
-	.name = "dev_avtimer",
-	.dev = { .platform_data = &dev_avtimer_pdata },
-};
 
 #define DSPS_PIL_GENERIC_NAME          "dsps"
 static void __init deluxe_j_init_dsps(void)
@@ -5312,8 +5227,8 @@ static void deluxe_j_init_1seg(void)
 
 #ifdef CONFIG_SERIAL_IRDA
 static uint32_t msm_uart_gsbi3_gpio[] = {
-	GPIO_CFG(SIR_TX, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
-	GPIO_CFG(SIR_RX, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),
+	GPIO_CFG(SIR_TX, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+	GPIO_CFG(SIR_RX, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
 };
 static void msm_uart_gsbi3_gpio_init(void)
 {
@@ -5529,16 +5444,16 @@ static void __init deluxe_j_common_init(void)
 #ifdef CONFIG_SUPPORT_USB_SPEAKER
 	pm_qos_add_request(&pm_qos_req_dma, PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
 #endif
-#if 1 
 	if ((get_kernel_flag() & KERNEL_FLAG_PM_MONITOR) ||
 		(!(get_kernel_flag() & KERNEL_FLAG_TEST_PWR_SUPPLY) && (!get_tamper_sf()))) {
 		htc_monitor_init();
 		htc_pm_monitor_init();
 	}
-#endif
 
-	platform_device_register(&msm_dev_avtimer_device);
 }
+
+unsigned long ion_kgsl_heap_vaddr = 0;
+unsigned long ion_kgsl_heap_paddr = 0;
 
 static void __init deluxe_j_allocate_memory_regions(void)
 {
@@ -5588,7 +5503,6 @@ static void __init deluxe_j_cdp_init(void)
 #ifdef CONFIG_MSM_CAMERA
 	deluxe_j_init_cam();
 #endif
-	platform_device_register(&cdp_kp_pdev);
 
 #ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
         if(!cpu_is_krait_v1())
@@ -5615,9 +5529,6 @@ static void __init deluxe_j_cdp_init(void)
 #define SIZE_ADDR3      (768 * 1024 * 1024)
 
 #define DDR_1GB_SIZE      (1024 * 1024 * 1024)
-
-int __init parse_tag_memsize(const struct tag *tags);
-static unsigned int mem_size_mb;
 
 static void __init deluxe_j_fixup(struct tag *tags, char **cmdline, struct meminfo *mi)
 {
