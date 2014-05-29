@@ -1835,42 +1835,7 @@ void msm_hsusb_setup_gpio(enum usb_otg_state state)
 }
 #endif
 
-static uint32_t uart_tx_gpio_tbl[] = {
-	GPIO_CFG(UART_TX, 2, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(UART_TX, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-};
-static uint32_t uart_rx_gpio_tbl[] = {
-	GPIO_CFG(UART_RX, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-	GPIO_CFG(UART_RX, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
-};
-
-static int msm_hsusb_vbus_power(bool on)
-{
-        static int prev_on;
-
-        if (on == prev_on)
-                return 0;
-
-        if (on) {
-		
-		gpio_tlmm_config(uart_tx_gpio_tbl[1], GPIO_CFG_ENABLE);
-		gpio_tlmm_config(uart_rx_gpio_tbl[1], GPIO_CFG_ENABLE);
-		gpio_set_value(UART_TX, 0);
-		gpio_set_value(UART_RX, 0);
-        } else {
-		
-		gpio_tlmm_config(uart_tx_gpio_tbl[0], GPIO_CFG_ENABLE);
-		gpio_tlmm_config(uart_rx_gpio_tbl[0], GPIO_CFG_ENABLE);
-        }
-
-        pr_info("%s(%s): success\n", __func__, on?"on":"off");
-
-        prev_on = on;
-
-        return 0;
-}
-
-
+static int msm_hsusb_vbus_power(bool on);
 static struct msm_otg_platform_data msm_otg_pdata = {
 	.mode			= USB_OTG,
 	.otg_control		= OTG_PMIC_CONTROL,
@@ -3111,6 +3076,7 @@ static struct i2c_board_info motion_sensor_gsbi_2_info[] = {
                 
         },
 };
+/*
 static uint8_t cm3629_mapping_table[] = {0x0, 0x3, 0x6, 0x9, 0xC,
                         0xF, 0x12, 0x15, 0x18, 0x1B,
                         0x1E, 0x21, 0x24, 0x27, 0x2A,
@@ -3123,7 +3089,7 @@ static uint8_t cm3629_mapping_table[] = {0x0, 0x3, 0x6, 0x9, 0xC,
                         0xAE, 0xB4, 0xBA, 0xC0, 0xC6,
                         0xCC, 0xD3, 0xDA, 0xE1, 0xE8,
                         0xEF, 0xF6, 0xFF};
-
+*/
 static DEFINE_MUTEX(pl_sensor_lock);
 static struct regulator *pl_reg_l16;
 static int capella_pl_sensor_lpm_power(uint8_t enable)
@@ -3181,28 +3147,20 @@ static struct cm3629_platform_data cm36282_pdata = {
 	.ps_select = CM3629_PS1_ONLY,
 	.intr = PM8921_GPIO_PM_TO_SYS(PROXIMITY_INT),
 	.levels = { 1, 3, 33, 929, 1440, 5614, 8553, 12415, 16278, 65535},
-	.correction = {100, 400, 900, 1600, 2500, 3600, 4900, 6400, 8100, 10000},
-	.golden_adc = 0x1900,
-#ifdef CONFIG_WSENSOR_ENABLE
-	.w_golden_adc = 0x1AE0,
-#endif
+        .golden_adc = 0x1900,
 	.power = NULL,
 	.lpm_power = capella_pl_sensor_lpm_power,
 	.cm3629_slave_address = 0xC0>>1,
 	.ps1_thd_set = 0x15,
 	.ps1_thd_no_cal = 0xF1,
 	.ps1_thd_with_cal = 0xD,
-	.ps_th_add = 10,
 	.ps_calibration_rule = 1,
-	.ps_conf1_val = CM3629_PS_DR_1_40 | CM3629_PS_IT_1_6T |
-			CM3629_PS1_PERS_2,
+	.ps_conf1_val = CM3629_PS_DR_1_80 | CM3629_PS_IT_1_6T |
+			CM3629_PS1_PERS_3,
 	.ps_conf2_val = CM3629_PS_ITB_1 | CM3629_PS_ITR_1 |
 			CM3629_PS2_INT_DIS | CM3629_PS1_INT_DIS,
 	.ps_conf3_val = CM3629_PS2_PROL_32,
-	.dark_level = 1,
-	.dynamical_threshold = 1,
-	.mapping_table = cm3629_mapping_table,
-	.mapping_size = ARRAY_SIZE(cm3629_mapping_table),
+	.dark_level = 3,
 };
 
 
@@ -3615,27 +3573,6 @@ static struct msm_thermal_data msm_thermal_pdata = {
 	.temp_hysteresis = 10,
 	.limit_freq = 918000,*/
 };
-
-static int __init check_dq_setup(char *str)
-{
-	int i = 0;
-	int size = 0;
-
-	size = sizeof(chg_batt_params)/sizeof(chg_batt_params[0]);
-
-	if (!strcmp(str, "PASS")) {
-		
-	} else {
-		for(i=0; i < size; i++)
-		{
-			chg_batt_params[i].max_voltage = 4200;
-			chg_batt_params[i].cool_bat_voltage = 4200;
-		}
-	}
-	return 1;
-}
-__setup("androidboot.dq=", check_dq_setup);
-
 
 #define MSM_SHARED_RAM_PHYS 0x80000000
 static void __init deluxe_j_map_io(void)
@@ -4269,12 +4206,12 @@ static struct platform_device hdmi_msm_device = {
 	.dev.platform_data = &hdmi_msm_data,
 };
 
+#define BOOST_5V	"ext_5v"
+static struct regulator *reg_boost_5v = NULL;
 
 static int hdmi_enable_5v(int on)
 {
-#if 0
 	static int prev_on = 0;
-
 	int rc;
 
 	if (on == prev_on)
@@ -4300,7 +4237,38 @@ static int hdmi_enable_5v(int on)
 	pr_info("%s(%s): success\n", __func__, on?"on":"off");
 
 	prev_on = on;
-#endif
+
+	return 0;
+}
+
+static int msm_hsusb_vbus_power(bool on)
+{
+	static int prev_on;
+	int rc;
+
+	if (on == prev_on)
+		return 0;
+
+	if (!reg_boost_5v)
+		_GET_REGULATOR(reg_boost_5v, BOOST_5V);
+
+	if (on) {
+		rc = regulator_enable(reg_boost_5v);
+		if (rc) {
+			pr_err("'%s' regulator enable failed, rc=%d\n",
+				BOOST_5V, rc);
+			return rc;
+		}
+	} else {
+		rc = regulator_disable(reg_boost_5v);
+		if (rc)
+			pr_warning("'%s' regulator disable failed, rc=%d\n",
+				BOOST_5V, rc);
+	}
+
+	pr_info("%s(%s): success\n", __func__, on?"on":"off");
+
+	prev_on = on;
 
 	return 0;
 }
