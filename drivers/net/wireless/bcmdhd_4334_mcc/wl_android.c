@@ -131,14 +131,12 @@ static int active_period = 20000;
 static int wl_android_active_expired = 0;
 struct timer_list *wl_android_active_timer = NULL;
 extern int msm_otg_setclk( int on);
-static int otg_clk_enabled = 0;
 static int assoc_count_buff = 0;
 extern int sta_event_sent;
 
 #define TRAFFIC_SUPER_HIGH_WATER_MARK	2600
 #define TRAFFIC_HIGH_WATER_MARK			2300
 #define TRAFFIC_LOW_WATER_MARK			256
-#define TRAFFIC_OTG_WATER_MARK			540
 typedef enum traffic_ind {
 	TRAFFIC_STATS_NORMAL = 0,
 	TRAFFIC_STATS_HIGH,
@@ -157,7 +155,6 @@ struct msm_bus_scale_pdata *bus_scale_table = NULL;
 uint32_t bus_perf_client = 0;
 
 static int screen_off = 0;
-int sta_connected = 0;
 static int traffic_stats_flag = TRAFFIC_STATS_NORMAL;
 static unsigned long current_traffic_count = 0;
 static unsigned long last_traffic_count = 0;
@@ -921,7 +918,6 @@ wl_android_set_mac_address_filter(struct net_device *dev, const char* str)
 #endif
 
 
-
 int wl_android_wifi_on(struct net_device *dev)
 {
 	int ret = 0;
@@ -973,13 +969,13 @@ int wl_android_wifi_on(struct net_device *dev)
 	}
 
 #ifdef CUSTOMER_HW_ONE
-	if(bus_scale_table) {
-		bus_perf_client =
-			msm_bus_scale_register_client(bus_scale_table);
-		if (!bus_perf_client)
-			printf("%s: Failed to register BUS "
-					"scaling client!!\n", __func__);
-	}
+if(bus_scale_table) {
+	 bus_perf_client =
+		 msm_bus_scale_register_client(bus_scale_table);
+	 if (!bus_perf_client)
+		 printf("%s: Failed to register BUS "
+				 "scaling client!!\n", __func__);
+ }
 exit:
 	mutex_unlock(&wl_wifionoff_mutex);
 #else
@@ -1036,7 +1032,6 @@ int wl_android_wifi_off(struct net_device *dev)
 	wlan_unlock_perf();
 	if (bus_perf_client)
 		msm_bus_scale_unregister_client(bus_perf_client);
-
 	mutex_unlock(&wl_wifionoff_mutex);
 	bcm_mdelay(500);
 #else
@@ -1451,9 +1446,10 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 	else if (strnicmp(command, CMD_LINKSPEED, strlen(CMD_LINKSPEED)) == 0) {
 		bytes_written = wl_android_get_link_speed(net, command, priv_cmd.total_len);
 	}
+#if 0
 #ifdef PKT_FILTER_SUPPORT
 	else if (strnicmp(command, CMD_RXFILTER_START, strlen(CMD_RXFILTER_START)) == 0) {
-#if 1
+#if 0
 		snprintf(command, 3, "OK");
 		bytes_written = strlen("OK");
 #else
@@ -1461,7 +1457,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #endif
 	}
 	else if (strnicmp(command, CMD_RXFILTER_STOP, strlen(CMD_RXFILTER_STOP)) == 0) {
-#if 1
+#if 0
 				snprintf(command, 3, "OK");
 				bytes_written = strlen("OK");
 #else
@@ -1480,9 +1476,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 			}
 		}
 #endif
-		
-		DHD_ERROR(("RXFILTER-ADD MULTICAST filter\n"));
-		wl_android_enable_pktfilter(net,1);
+		wl_android_set_pktfilter(net, (struct dd_pkt_filter_s *)&command[32]);
 		snprintf(command, 3, "OK");
 		bytes_written = strlen("OK");		
 #else
@@ -1501,9 +1495,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 			}
 		}
 #endif
-		
-		DHD_ERROR(("RXFILTER-REMOVE MULTICAST filter\n"));
-		wl_android_enable_pktfilter(net,0);
+		wl_android_set_pktfilter(net, (struct dd_pkt_filter_s *)&command[32]);
 		snprintf(command, 3, "OK");
 		bytes_written = strlen("OK");
 #else
@@ -1512,6 +1504,7 @@ int wl_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
 #endif
 	}
 #endif 
+#endif
 	else if (strnicmp(command, CMD_BTCOEXSCAN_START, strlen(CMD_BTCOEXSCAN_START)) == 0) {
 		
 	}
@@ -2540,10 +2533,8 @@ int multi_core_locked = 0;
 void wlan_lock_multi_core(struct net_device *dev)
 {
 	dhd_pub_t *dhdp = bcmsdh_get_drvdata();
-	char buf[32];
 
-	sprintf(buf, "PERF_LOCK cpu=%u", (nr_cpu_ids <= 2)? nr_cpu_ids: 2);
-	wl_cfg80211_send_priv_event(dev, buf);
+	wl_cfg80211_send_priv_event(dev, "PERF_LOCK");
 	multi_core_locked = 1;
 	if (dhdp) {
 		dhd_sched_dpc(dhdp);
@@ -2576,10 +2567,10 @@ void wl_android_traffic_monitor(struct net_device *dev)
 	dhd_get_txrx_stats(dev, &rx_packets_count, &tx_packets_count);
 	current_traffic_count = rx_packets_count + tx_packets_count;
 
-	if ((current_traffic_count >= last_traffic_count && jiffies > last_traffic_count_jiffies) || screen_off || !sta_connected) {
+	if ((current_traffic_count >= last_traffic_count && jiffies > last_traffic_count_jiffies) || screen_off) {
         
-        if (screen_off || !sta_connected) {
-            printf("set traffic = 0 and relase performace lock when %s", screen_off? "screen off": "disconnected");
+        if (screen_off) {
+            printf("set traffic = 0 and relase performace lock when screen off");
             traffic_diff = 0;
         }
         else {
@@ -2592,24 +2583,6 @@ void wl_android_traffic_monitor(struct net_device *dev)
                 traffic_diff = 0;
             }
         }
-
-		if (traffic_diff < TRAFFIC_LOW_WATER_MARK) {
-			if (otg_clk_enabled) {
-				printf("unlocking otg clk");
-				msm_otg_setclk(0);
-				otg_clk_enabled = 0;
-			}
-		} else if (TRAFFIC_LOW_WATER_MARK <= traffic_diff && traffic_diff < TRAFFIC_OTG_WATER_MARK) {
-			
-			;
-		} else if (traffic_diff >= TRAFFIC_OTG_WATER_MARK) {
-			if (!otg_clk_enabled) {
-				printf("locking otg clk");
-				otg_clk_enabled = 1;
-				msm_otg_setclk(1);
-			}
-		}
-
         switch (traffic_stats_flag) {
         case TRAFFIC_STATS_NORMAL:
 			if (traffic_diff > TRAFFIC_HIGH_WATER_MARK) {

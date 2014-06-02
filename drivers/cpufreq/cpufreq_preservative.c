@@ -24,23 +24,22 @@
 #include "../gpu/msm/kgsl.h"
 
 #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
-#define SAMPLE_RATE			(40009)
-#define OPTIMAL_POSITION			(3)
-#define TABLE_SIZE			(15)
-#define HYSTERESIS			(7)
+#define SAMPLE_RATE			(50000)
+#define OPTIMAL_POSITION			(5)
+#define TABLE_SIZE			(14)
+#define HYSTERESIS			(9)
 #define UP_THRESH			(100)
 
-static const int valid_fqs[TABLE_SIZE] = {162000, 270000, 384000,486000,594000, 702000, 810000,
-			918000, 1026000, 1134000, 1242000,
-			135000, 1512000, 1674000, 1728000};
+static const int valid_fqs[TABLE_SIZE] = {162000, 270000, 384000, 486000, 540000,
+			648000, 702000, 810000, 918000, 1134000,
+			1242000, 1350000, 1458000, 1512000};
 static void do_dbs_timer(struct work_struct *work);
 
 static int thresh_adj = 0;
 static int opt_pos = OPTIMAL_POSITION;
+extern bool go_opt;
 static unsigned int dbs_enable, down_requests, prev_table_position, freq_table_position, min_sampling_rate;
 bool early_suspended = false;
-bool plug_boost = false;
-bool hyst_flag = false;
 
 struct cpu_dbs_info_s {
 	cputime64_t prev_cpu_idle;
@@ -225,6 +224,7 @@ static int get_load(struct cpufreq_policy *policy)
 
 static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 {
+	
 	unsigned int target_table_position = 0;
 	unsigned int max_load, freq_target, j;
 	struct cpufreq_policy *policy = this_dbs_info->cur_policy;
@@ -266,25 +266,11 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	if (!early_suspended) {
 		// apply hysteresis before dropping to lower bus speeds
 		if (freq_table_position < opt_pos) {
-			if (++down_requests >= HYSTERESIS) {
-				hyst_flag = true;
-			} else {
-				freq_table_position = opt_pos;
-			}
+			freq_table_position = opt_pos;
+			if (++down_requests >= HYSTERESIS) freq_table_position = 0;
 		} else {
 			down_requests = 0;
 		}
-
-
-		if (plug_boost) {
-			freq_table_position = TABLE_SIZE - 1;	//boost for hotplugging
-			plug_boost = false;
-			down_requests = 0;
-		}
-
-	} else {
-		if (freq_table_position > opt_pos)
-				freq_table_position = OPTIMAL_POSITION;  // if early suspended - limit max fq. 
 	}
 
 	this_dbs_info->requested_freq = valid_fqs[freq_table_position];
@@ -297,15 +283,6 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
 	__cpufreq_driver_target(policy, this_dbs_info->requested_freq,
 			CPUFREQ_RELATION_H);
-
-	if (hyst_flag) {
-		prev_table_position = 0;
-		freq_table_position--;
-		hyst_flag = false;
-	} else {
-		prev_table_position = freq_table_position;
-	}
-
 	return;
 }
 

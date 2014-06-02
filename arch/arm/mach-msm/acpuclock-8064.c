@@ -149,7 +149,6 @@ static struct l2_level l2_freq_tbl[] __initdata = {
 	[13] = { { 1026000, HFPLL, 1, 0x26 }, 1150000, 1150000, 5 },
 	[14] = { { 1080000, HFPLL, 1, 0x28 }, 1150000, 1150000, 5 },
 	[15] = { { 1134000, HFPLL, 1, 0x2A }, 1150000, 1150000, 5 },
-	[16] = { { 1188000, HFPLL, 1, 0x2C }, 1150000, 1150000, 5 },
 #else
 	[0]  = { {  384000, PLL_8, 0, 0x00 },  950000, 1050000, 1 },
 	[1]  = { {  432000, HFPLL, 2, 0x20 }, 1050000, 1050000, 2 },
@@ -166,18 +165,15 @@ static struct l2_level l2_freq_tbl[] __initdata = {
 	[12] = { { 1026000, HFPLL, 1, 0x26 }, 1150000, 1150000, 5 },
 	[13] = { { 1080000, HFPLL, 1, 0x28 }, 1150000, 1150000, 5 },
 	[14] = { { 1134000, HFPLL, 1, 0x2A }, 1150000, 1150000, 5 },
-	[15] = { { 1188000, HFPLL, 1, 0x2C }, 1150000, 1150000, 5 },
 #endif
 	{ }
 };
 
 static struct acpu_level tbl_slow[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
-	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   850000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   850000 },
-	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   850000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   900000 },
-	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   900000 },
+	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   900000 },
+	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   925000 },
+	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   950000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   950000 },
 #else
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(0),   950000 },
@@ -203,6 +199,7 @@ static struct acpu_level tbl_slow[] __initdata = {
 	{ 0, {  1404000, HFPLL, 1, 0x34 }, L2(14), 1237500 },
 	{ 1, {  1458000, HFPLL, 1, 0x36 }, L2(14), 1237500 },
 	{ 1, {  1512000, HFPLL, 1, 0x38 }, L2(14), 1250000 },
+	{ 1, {  1566000, HFPLL, 1, 0x3A }, L2(14), 1250000 },
 	{ 1, {  1674000, HFPLL, 1, 0x3E }, L2(14), 1275000 },
 	{ 1, {  1728000, HFPLL, 1, 0x40 }, L2(14), 1300000 },
 	{ 0, { 0 } }
@@ -210,11 +207,9 @@ static struct acpu_level tbl_slow[] __initdata = {
 
 static struct acpu_level tbl_nom[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
-	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   825000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   825000 },
-	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   825000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   850000 },
-	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   850000 },
+	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   850000 },
+	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   875000 },
+	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   900000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   900000 },
 #else
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(0),   900000 },
@@ -240,6 +235,7 @@ static struct acpu_level tbl_nom[] __initdata = {
 	{ 0, {  1404000, HFPLL, 1, 0x34 }, L2(14), 1187500 },
 	{ 1, {  1458000, HFPLL, 1, 0x36 }, L2(14), 1187500 },
 	{ 1, {  1512000, HFPLL, 1, 0x38 }, L2(14), 1200000 },
+	{ 1, {  1566000, HFPLL, 1, 0x3A }, L2(14), 1200000 },
 	{ 1, {  1674000, HFPLL, 1, 0x3E }, L2(14), 1225000 },
 	{ 1, {  1728000, HFPLL, 1, 0x40 }, L2(14), 1250000 },
 	{ 0, { 0 } }
@@ -248,10 +244,8 @@ static struct acpu_level tbl_nom[] __initdata = {
 static struct acpu_level tbl_fast[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   800000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   800000 },
-	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   800000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   825000 },
-	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   825000 },
+	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   825000 },
+	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   850000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   850000 },
 #else
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(0),   850000 },
@@ -277,6 +271,7 @@ static struct acpu_level tbl_fast[] __initdata = {
 	{ 0, {  1404000, HFPLL, 1, 0x34 }, L2(14), 1137500 },
 	{ 1, {  1458000, HFPLL, 1, 0x36 }, L2(14), 1137500 },
 	{ 1, {  1512000, HFPLL, 1, 0x38 }, L2(14), 1150000 },
+	{ 1, {  1566000, HFPLL, 1, 0x3A }, L2(14), 1150000 },
 	{ 1, {  1674000, HFPLL, 1, 0x3E }, L2(14), 1175000 },
 	{ 1, {  1728000, HFPLL, 1, 0x40 }, L2(14), 1200000 },
 	{ 0, { 0 } }
@@ -285,10 +280,8 @@ static struct acpu_level tbl_fast[] __initdata = {
 static struct acpu_level tbl_faster[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   800000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   800000 },
-	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   800000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   825000 },
-	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   825000 },
+	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   825000 },
+	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   850000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   850000 },
 #else
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(0),   850000 },
@@ -314,6 +307,7 @@ static struct acpu_level tbl_faster[] __initdata = {
 	{ 0, {  1404000, HFPLL, 1, 0x34 }, L2(14), 1112500 },
 	{ 1, {  1458000, HFPLL, 1, 0x36 }, L2(14), 1112500 },
 	{ 1, {  1512000, HFPLL, 1, 0x38 }, L2(14), 1125000 },
+	{ 1, {  1566000, HFPLL, 1, 0x3A }, L2(14), 1125000 },
 	{ 1, {  1674000, HFPLL, 1, 0x3E }, L2(14), 1175000 },
 	{ 1, {  1728000, HFPLL, 1, 0x40 }, L2(14), 1200000 },
 	{ 0, { 0 } }
@@ -322,9 +316,7 @@ static struct acpu_level tbl_faster[] __initdata = {
 static struct acpu_level tbl_PVS0_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   900000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   900000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   900000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   925000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   925000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   950000 },
 #else
@@ -349,9 +341,7 @@ static struct acpu_level tbl_PVS0_1700MHz[] __initdata = {
 static struct acpu_level tbl_PVS1_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   900000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   900000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   900000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   925000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   925000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   950000 },
 #else
@@ -376,9 +366,7 @@ static struct acpu_level tbl_PVS1_1700MHz[] __initdata = {
 static struct acpu_level tbl_PVS2_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   875000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   875000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   875000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   900000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   900000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   925000 },
 #else
@@ -403,9 +391,7 @@ static struct acpu_level tbl_PVS2_1700MHz[] __initdata = {
 static struct acpu_level tbl_PVS3_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   850000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   850000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   850000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   875000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   875000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   900000 },
 #else
@@ -430,9 +416,7 @@ static struct acpu_level tbl_PVS3_1700MHz[] __initdata = {
 static struct acpu_level tbl_PVS4_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   825000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   825000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   825000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   850000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   850000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   875000 },
 #else
@@ -457,9 +441,7 @@ static struct acpu_level tbl_PVS4_1700MHz[] __initdata = {
 static struct acpu_level tbl_PVS5_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   825000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   825000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   825000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   850000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   850000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   875000 },
 #else
@@ -484,9 +466,7 @@ static struct acpu_level tbl_PVS5_1700MHz[] __initdata = {
 static struct acpu_level tbl_PVS6_1700MHz[] __initdata = {
 #ifdef CONFIG_LOW_CPUCLOCKS
 	{ 1, {   162000, HFPLL, 2, 0x0C }, L2(0),   825000 },
-	{ 1, {   216000, HFPLL, 2, 0x10 }, L2(0),   825000 },
 	{ 1, {   270000, HFPLL, 2, 0x14 }, L2(0),   825000 },
-	{ 1, {   324000, HFPLL, 2, 0x18 }, L2(0),   850000 },
 	{ 1, {   378000, HFPLL, 2, 0x1C }, L2(0),   850000 },
 	{ 1, {   384000, PLL_8, 0, 0x00 }, L2(1),   875000 },
 #else

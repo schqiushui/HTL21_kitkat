@@ -87,7 +87,7 @@
 #define WLC_HT_TKIP_RESTRICT    0x02     
 #define WLC_HT_WEP_RESTRICT     0x01    
 
-#define CUSTOM_AP_AMPDU_BA_WSIZE    16
+#define CUSTOM_AP_AMPDU_BA_WSIZE    32
 
 extern int dhdcdc_set_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len);
 extern int wl_android_is_during_wifi_call(void);
@@ -100,8 +100,6 @@ extern unsigned int get_tamper_sf(void);
 static int rt_class(int priority);
 extern void pet_watchdog(void);
 
-extern void wl_cfg80211_adj_mira_pm(int is_screen_off);
-
 static unsigned int dhdhtc_power_ctrl_mask = 0;
 int dhdcdc_power_active_while_plugin = 1;
 int dhdcdc_wifiLock = 0; 
@@ -112,8 +110,6 @@ static int prev_wlan_ioprio_idle=0;
 extern int multi_core_locked;
 dhd_pub_t *priv_dhdp = NULL;
 int is_screen_off = 0;
-int multicast_lock =0;
-static struct mutex enable_pktfilter_mutex;
 
 extern int net_os_send_hang_message(struct net_device *dev);
 void wl_android_set_screen_off(int off);
@@ -757,17 +753,10 @@ void dhd_set_packet_filter(dhd_pub_t *dhd)
 
 void dhd_enable_packet_filter(int value, dhd_pub_t *dhd)
 {
-	
 #ifdef PKT_FILTER_SUPPORT
 	int i;
-	
-	mutex_lock(&enable_pktfilter_mutex);
-	if(!multicast_lock&&is_screen_off)
-		value = 1;
-	else
-		value = 0;
-	printf("%s: enter, value = %d, multicast_lock = %d, is_screen_off= %d\n", __FUNCTION__, value, multicast_lock, is_screen_off);
-	
+
+	DHD_TRACE(("%s: enter, value = %d\n", __FUNCTION__, value));
 	
 	
 	if (dhd_pkt_filter_enable && (!value ||
@@ -787,13 +776,8 @@ void dhd_enable_packet_filter(int value, dhd_pub_t *dhd)
 				value, dhd_master_mode);
 		}
 	}
-	
-	mutex_unlock(&enable_pktfilter_mutex);
-	
 #endif 
-	
 }
-
 
 static int dhd_suspend_resume_helper(struct dhd_info *dhd, int val, int force)
 {
@@ -1242,11 +1226,13 @@ dhd_op_if(dhd_if_t *ifp)
 				wl_cfg80211_ifdel_ops(ifp->net);
 			}
 #endif
+#ifndef APSTA_CONCURRENT
 			
 			msleep(300);
 			
 			if (ifp->net->reg_state == NETREG_REGISTERED)
-				unregister_netdev(ifp->net);
+#endif
+			unregister_netdev(ifp->net);
 			ret = DHD_DEL_IF;	
 #ifdef WL_CFG80211
 			if (dhd->dhd_state & DHD_ATTACH_STATE_CFG80211) {
@@ -2211,7 +2197,6 @@ dhd_dpc_thread(void *data)
 	tsk_ctl_t *tsk = (tsk_ctl_t *)data;
 	dhd_info_t *dhd = (dhd_info_t *)tsk->parent;
 #ifdef CUSTOMER_HW_ONE
-	unsigned long pet_dog_start_time = 0;
 	unsigned long start_time = 0;
 #endif
 	if (dhd_dpc_prio > 0)
@@ -2229,21 +2214,16 @@ dhd_dpc_thread(void *data)
 #endif
 
 #ifdef CUSTOM_DPC_CPUCORE
-	set_cpus_allowed_ptr(current, cpumask_of(CUSTOM_DPC_CPUCORE));
+		set_cpus_allowed_ptr(current, cpumask_of(CUSTOM_DPC_CPUCORE));
 #endif 
 
 	
 	while (1) {
 #ifdef CUSTOMER_HW_ONE
-		if (time_after(jiffies, pet_dog_start_time + 3*HZ) && rt_class(dhd_dpc_prio)) {
-			DHD_ERROR(("dhd_bus_dpc(): kick dog!\n"));
-			pet_watchdog();
-			pet_dog_start_time = jiffies;
-		}
-		if(prev_wlan_ioprio_idle != wlan_ioprio_idle) {
-			set_wlan_ioprio();
-			prev_wlan_ioprio_idle = wlan_ioprio_idle;
-		}
+        if(prev_wlan_ioprio_idle != wlan_ioprio_idle){
+            set_wlan_ioprio();
+            prev_wlan_ioprio_idle = wlan_ioprio_idle;
+        }
 #endif
 
 		if (!binary_sema_down(tsk)) {
@@ -2274,16 +2254,17 @@ dhd_dpc_thread(void *data)
 #ifdef CUSTOMER_HW_ONE
 					if (time_after(jiffies, start_time + 3*HZ) && rt_class(dhd_dpc_prio)) {
 						DHD_ERROR(("dhd_bus_dpc is busy in real time priority over 3 secs!\n"));
-						if (cpu_core == 0) {
-							ret = set_cpus_allowed_ptr(current, cpumask_of(nr_cpu_ids-1));
-							if ( ret ) {
-								DHD_ERROR(("set_cpus_allowed_ptr to 3 failed, ret=%d\n", ret));
-							} else {
-								cpu_core = nr_cpu_ids - 1;
-								DHD_ERROR(("switch task to cpu %d due to over 3 secs.\n", cpu_core));
-							}
-						}
 						start_time = jiffies;
+					}
+
+					if ((cpu_core == 0) && time_after(jiffies, start_time + 3*HZ)) {
+						ret = set_cpus_allowed_ptr(current, cpumask_of(3));
+						if ( ret ) {
+							DHD_ERROR(("set_cpus_allowed_ptr to 3 failed, ret=%d\n", ret));
+						} else {
+							cpu_core = 3;
+							DHD_ERROR(("switch task to cpu 3 due to over 3 secs.\n"));
+						}
 					}
 #endif
 				}
@@ -2986,7 +2967,7 @@ dhd_stop(struct net_device *net)
 #if defined(CUSTOMER_HW_ONE) && defined(APSTA_CONCURRENT)
 		if (ap_net_dev || ((dhd->dhd_state & DHD_ATTACH_STATE_ADD_IF) &&
 			(dhd->dhd_state & DHD_ATTACH_STATE_CFG80211))) {
-			printf("clean interface and free parameters, and set ap_cfg_running to FALSE");
+			printf("clean interface and free parameters");
 			dhd_cleanup_virt_ifaces(dhd);
 			ap_net_dev = NULL;
 			ap_cfg_running = FALSE;
@@ -3377,16 +3358,12 @@ printf("Read PCBID = %x\n", system_rev);
 	}
 #endif
 
-#ifdef CONFIG_MACH_TC2
+#ifdef CONFIG_MACH_DUMMY
 	if (system_rev >= PVT){
 		strcpy(nvram_path, "/system/etc/calibration.gpio4");
 	}
 #endif
 
-#ifdef CONFIG_MACH_M4_UL
-	strcpy(nvram_path, "/system/etc/calibration.gpio4");
-#endif
-
 #ifdef CONFIG_MACH_DUMMY
 	strcpy(nvram_path, "/system/etc/calibration.gpio4");
 #endif
@@ -3403,7 +3380,11 @@ printf("Read PCBID = %x\n", system_rev);
 	strcpy(nvram_path, "/system/etc/calibration.gpio4");
 #endif
 
-#ifdef CONFIG_MACH_ZIP_CL
+#ifdef CONFIG_MACH_DUMMY
+	strcpy(nvram_path, "/system/etc/calibration.gpio4");
+#endif
+
+#ifdef CONFIG_MACH_DUMMY
 	strcpy(nvram_path, "/system/etc/calibration.gpio4");
 #endif
 
@@ -4172,9 +4153,6 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	}
 	if ((!op_mode && strstr(fw_path, "_apsta") != NULL) ||
 		(op_mode == DHD_FLAG_HOSTAP_MODE)) {
-#ifdef DHDTCPACK_SUPPRESS
-		dhd_use_tcpack_suppress = FALSE;
-#endif
         ampdu_ba_wsize = CUSTOM_AP_AMPDU_BA_WSIZE;
 #ifdef SET_RANDOM_MAC_SOFTAP
 		uint rand_mac;
@@ -4214,9 +4192,6 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	}
 	else {
 		uint32 concurrent_mode = 0;
-#ifdef DHDTCPACK_SUPPRESS
-		dhd_use_tcpack_suppress = TRUE;
-#endif
 		if ((!op_mode && strstr(fw_path, "_p2p") != NULL) ||
 			(op_mode == DHD_FLAG_P2P_MODE)) {
 #if defined(ARP_OFFLOAD_SUPPORT)
@@ -4371,9 +4346,6 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 				DHD_ERROR(("%s set keeplive failed %d\n",
 				__FUNCTION__, res));
 		}
-        
-        dhd_pkt_filter_enable = TRUE;
-        
 	}
 #endif 
 #ifdef USE_WL_TXBF
@@ -4547,10 +4519,7 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	dhd_arp_enable = arpoe;
 #endif 
 
-
 #ifdef PKT_FILTER_SUPPORT
-	mutex_init(&enable_pktfilter_mutex);
-	
 	
 	dhd->pktfilter_count = 6;
 	
@@ -6060,6 +6029,7 @@ int dhd_os_enable_packet_filter(dhd_pub_t *dhdp, int val)
 int net_os_enable_packet_filter(struct net_device *dev, int val)
 {
 	dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
+
 	return dhd_os_enable_packet_filter(&dhd->pub, val);
 }
 #endif 
@@ -7150,7 +7120,6 @@ void htsf_update(dhd_info_t *dhd, void *data)
 
 #endif 
 
-extern void wl_cfg80211_dhd_chk_link(void);
 #ifndef CUSTOMER_HW_ONE
 static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 {
@@ -7242,7 +7211,6 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 #ifdef BCM4329_LOW_POWER
 	int ignore_bcmc = 1;
 #endif
-	int mchan_algo = 0; 
 	char iovbuf[WL_EVENTING_MASK_LEN+32];
     char eventmask[WL_EVENTING_MASK_LEN];
     int ret = 0;
@@ -7360,19 +7328,10 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 					goto exit;
 				}
 
-				
-				mchan_algo = 0;
-				bcm_mkiovar("mchan_algo", (char *)&mchan_algo,
-						4, iovbuf, sizeof(iovbuf));
-				dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-				
-				wl_cfg80211_adj_mira_pm(is_screen_off);
-
 			} else {
 #ifdef PKT_FILTER_SUPPORT
 				dhd->early_suspended = 0;
 #endif
-                wl_cfg80211_dhd_chk_link();
 				ret = dhdhtc_update_wifi_power_mode(is_screen_off);
 				if(ret < 0){
 					DHD_ERROR(("%s Set dhdhtc_update_wifi_power_mode error %d\n", __FUNCTION__, ret));
@@ -7415,16 +7374,6 @@ static int dhd_set_suspend(int value, dhd_pub_t *dhd)
 					DHD_ERROR(("%s Set kerrpalive error %d\n", __FUNCTION__, ret));
 					goto exit;
 				}
-
-	
-				
-				mchan_algo = 1;
-				bcm_mkiovar("mchan_algo", (char *)&mchan_algo,
-						4, iovbuf, sizeof(iovbuf));
-				dhd_wl_ioctl_cmd(dhd, WLC_SET_VAR, iovbuf, sizeof(iovbuf), TRUE, 0);
-				
-				wl_cfg80211_adj_mira_pm(is_screen_off);
-	
 
 				
 				
@@ -7503,7 +7452,7 @@ adjust_thread_priority(void)
 				cpumask_clear(&mask);
 				cpumask_set_cpu(2, &mask);
 				if (sched_setaffinity(0, &mask) < 0) {
-					
+					printf("sched_setaffinity failed");
 				}
 				else {
 					printf("[adjust_thread_priority]sched_setaffinity ok");
@@ -7534,9 +7483,9 @@ adjust_rxf_thread_priority(void)
 				
 				cpumask_t mask;
 				cpumask_clear(&mask);
-				cpumask_set_cpu(nr_cpu_ids-1, &mask);
+				cpumask_set_cpu(3, &mask);
 				if (sched_setaffinity(0, &mask) < 0) {
-					
+					printf("sched_setaffinity failed");
 				}
 				else {
 					printf("[adjust_rxf_thread_priority]sched_setaffinity ok");
@@ -7560,17 +7509,8 @@ int wl_android_set_pktfilter(struct net_device *dev, struct dd_pkt_filter_s *dat
 {
     dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
     return dhd_set_pktfilter(&dhd->pub, data->add, data->id, data->offset, data->mask, data->pattern);
+
 }
-
-void wl_android_enable_pktfilter(struct net_device *dev, int multicastlock)
-{
-    dhd_info_t *dhd = *(dhd_info_t **)netdev_priv(dev);
-	multicast_lock = multicastlock;
-	
-    dhd_enable_packet_filter(0, &dhd->pub);
-}
-
-
 
 bool check_hang_already(struct net_device *dev)
 {
